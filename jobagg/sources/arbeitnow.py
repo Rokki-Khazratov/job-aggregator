@@ -55,7 +55,7 @@ class ArbeitnowSource(BaseJobSource):
                     "salary_max": None,
                     "salary_currency": None,
                     "salary_is_predicted": None,
-                    "date_posted": job.get("created_at"),
+                    "date_posted": _ts_to_iso(job.get("created_at")),
                     "date_updated_source": None,
                     "description_text": desc,
                     "description_hash": description_hash(desc),
@@ -67,3 +67,13 @@ class ArbeitnowSource(BaseJobSource):
             links = data.get("links") or {}
             url = links.get("next")
             page += 1
+
+
+def _ts_to_iso(value: int | str | None) -> str | None:
+    if value is None:
+        return None
+    from datetime import datetime, timezone
+    try:
+        return datetime.fromtimestamp(int(value), tz=timezone.utc).date().isoformat()
+    except (ValueError, OSError):
+        return str(value)
