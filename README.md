@@ -1,43 +1,43 @@
 # jobagg — DACH Job Aggregator MVP
 
-Минимальный CLI-инструмент для сбора вакансий из нескольких юридически нормальных источников, нормализации в единую схему и хранения в SQLite.
+A minimal CLI tool for collecting job listings from multiple legally compliant sources, normalizing them into a unified schema, and storing them in SQLite.
 
-## Источники
+## Sources
 
-| Источник | Тип | Auth | Роль |
+| Source | Type | Auth | Role |
 |---|---|---|---|
-| Bundesagentur für Arbeit | API | Нет (публичный key) | Базовый DE-источник |
-| Greenhouse Job Board API | ATS | Нет | Direct-employer feed |
-| Lever Postings API | ATS | Нет | Direct-employer feed |
-| Arbeitnow | Aggregator | Нет | EU/DACH feed |
-| Adzuna | Aggregator | app_id + app_key | Licensed enrichment (опционально) |
+| Bundesagentur für Arbeit | API | None (public key) | Primary DE source |
+| Greenhouse Job Board API | ATS | None | Direct-employer feed |
+| Lever Postings API | ATS | None | Direct-employer feed |
+| Arbeitnow | Aggregator | None | EU/DACH feed |
+| Adzuna | Aggregator | app_id + app_key | Licensed enrichment (optional) |
 
-> **AMS** не поддерживается как автоматический источник — их условия запрещают automated aggregation.
+> **AMS** is not supported as an automated source — their terms prohibit automated aggregation.
 
-## Быстрый старт
+## Quick start
 
 ```bash
-# 1. Установить зависимости
+# 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. Настроить окружение
+# 2. Configure environment
 cp .env.example .env
-# Отредактируйте .env при необходимости
+# Edit .env if needed
 
-# 3. Инициализировать БД
+# 3. Initialize the database
 python3 -m jobagg init-db
 
-# 4. Синкнуть вакансии
+# 4. Sync jobs
 python3 -m jobagg sync bundesagentur --query "Python" --location "Berlin" --pages 2
 
-# 5. Посмотреть результат
+# 5. View results
 python3 -m jobagg list-jobs --country DE --limit 10
 python3 -m jobagg show-job --id 1
 ```
 
-Подробная инструкция: [SETUP.md](SETUP.md)
+Full setup guide: [SETUP.md](SETUP.md)
 
-## Структура проекта
+## Project structure
 
 ```
 jobagg/
@@ -52,12 +52,12 @@ jobagg/
     lever.py
     arbeitnow.py
   seeds/
-    greenhouse.txt ← board tokens (заполнить вручную)
-    lever.txt      ← site names (заполнить вручную)
+    greenhouse.txt ← board tokens (fill in manually)
+    lever.txt      ← site names (fill in manually)
   tests/           ← pytest + httpx.MockTransport
 ```
 
-## CLI
+## CLI reference
 
 ```bash
 python3 -m jobagg init-db
@@ -69,7 +69,7 @@ python3 -m jobagg list-jobs [--country CODE] [--limit N]
 python3 -m jobagg show-job --id N
 ```
 
-## Тесты
+## Tests
 
 ```bash
 python3 -m pytest jobagg/tests/ -v
@@ -77,8 +77,8 @@ python3 -m pytest jobagg/tests/ -v
 
 ## Legal
 
-- **Bundesagentur:** Публичный API. Не скрейпить контактные данные (CAPTCHA-protected).
-- **Greenhouse / Lever:** Published job board APIs, read-only. Не использовать POST-apply endpoints.
-- **Arbeitnow:** Free public API. Не злоупотреблять частотой запросов.
-- **Adzuna:** Trial 14 дней. Ongoing commercial aggregation требует письменного соглашения.
-- **AMS:** Automated aggregation запрещена ToS. Только ручные ссылки.
+- **Bundesagentur:** Public API. Do not scrape contact details (CAPTCHA-protected).
+- **Greenhouse / Lever:** Published job board APIs, read-only. Do not use POST apply endpoints.
+- **Arbeitnow:** Free public API. Do not abuse request frequency.
+- **Adzuna:** 14-day trial. Ongoing commercial aggregation requires a written agreement.
+- **AMS:** Automated aggregation is prohibited by ToS. Manual links only.

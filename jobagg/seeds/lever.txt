@@ -1,4 +1,5 @@
-# Lever site names — add one per line
-# Example: netflix
-# Example: stripe
+# Lever site names — one per line
 # Find the site name in the career page URL: jobs.lever.co/{site}
+# Example:
+# netflix
+# stripe

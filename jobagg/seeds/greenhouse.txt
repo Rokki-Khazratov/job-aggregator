@@ -1,4 +1,5 @@
-# Greenhouse board tokens — add one per line
-# Example: netflix
-# Example: shopify
+# Greenhouse board tokens — one per line
 # Find the token in the career page URL: boards.greenhouse.io/{token}
+# Example:
+# netflix
+# shopify

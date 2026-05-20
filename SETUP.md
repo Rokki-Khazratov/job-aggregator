@@ -1,40 +1,40 @@
-# SETUP — Как запустить jobagg
+# SETUP — Getting started with jobagg
 
-## 1. Требования
+## 1. Requirements
 
 - Python 3.11+
-- Интернет (для запросов к API)
+- Internet connection (for API requests)
 
-## 2. Установка зависимостей
+## 2. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 3. Настройка .env
+## 3. Configure .env
 
 ```bash
 cp .env.example .env
 ```
 
-Откройте `.env` в редакторе и заполните нужные значения:
+Open `.env` in a text editor and fill in the values:
 
-| Переменная | Описание | Где взять | Обязательно |
+| Variable | Description | Where to get it | Required |
 |---|---|---|---|
-| `JOBAGG_DB_PATH` | Путь к SQLite-файлу БД | Любой путь, например `./jobagg.db` | Нет (default: `jobagg.db`) |
-| `JOBAGG_USER_AGENT` | User-Agent для HTTP-запросов | Укажите свой email: `jobagg/0.1 (+contact: YOUR@EMAIL.COM)` | Нет |
-| `ADZUNA_APP_ID` | App ID для Adzuna API | [developer.adzuna.com](https://developer.adzuna.com) → My Apps → App ID | Только для Adzuna |
-| `ADZUNA_APP_KEY` | App Key для Adzuna API | Та же страница → App Key | Только для Adzuna |
+| `JOBAGG_DB_PATH` | Path to the SQLite database file | Any path, e.g. `./jobagg.db` | No (default: `jobagg.db`) |
+| `JOBAGG_USER_AGENT` | User-Agent header for HTTP requests | Put your email: `jobagg/0.1 (+contact: YOUR@EMAIL.COM)` | No |
+| `ADZUNA_APP_ID` | App ID for Adzuna API | [developer.adzuna.com](https://developer.adzuna.com) → My Apps → App ID | Only for Adzuna |
+| `ADZUNA_APP_KEY` | App Key for Adzuna API | Same page → App Key | Only for Adzuna |
 
-> **Важно:** `.env` не нужен для Bundesagentur и Arbeitnow — они работают без ключей.
+> **Note:** No `.env` setup is required for Bundesagentur or Arbeitnow — they work without any credentials.
 
-## 4. Заполнить seed-файлы для Greenhouse и Lever
+## 4. Fill in seed files for Greenhouse and Lever
 
-Greenhouse и Lever **не требуют API-ключей** для чтения вакансий. Нужно только указать, какие компании синкать.
+Greenhouse and Lever **do not require API keys** for reading job listings. You only need to specify which companies to sync.
 
 ### Greenhouse — `jobagg/seeds/greenhouse.txt`
 
-Добавьте board tokens по одному на строку (без пробелов, без `#`):
+Add board tokens, one per line (no spaces, no `#`):
 
 ```
 netflix
@@ -42,12 +42,12 @@ shopify
 airbnb
 ```
 
-**Где найти board token:**
-Откройте страницу вакансий компании. Если URL выглядит как `boards.greenhouse.io/netflix` — токен это `netflix`.
+**How to find the board token:**
+Open a company's career page. If the URL is `boards.greenhouse.io/netflix`, the token is `netflix`.
 
 ### Lever — `jobagg/seeds/lever.txt`
 
-Добавьте site names по одному на строку:
+Add site names, one per line:
 
 ```
 netflix
@@ -55,20 +55,20 @@ stripe
 revolut
 ```
 
-**Где найти site name:**
-Откройте страницу вакансий компании. Если URL выглядит как `jobs.lever.co/stripe` — site name это `stripe`.
+**How to find the site name:**
+Open a company's career page. If the URL is `jobs.lever.co/stripe`, the site name is `stripe`.
 
-## 5. Инициализация БД
+## 5. Initialize the database
 
 ```bash
 python3 -m jobagg init-db
 ```
 
-Создаёт таблицы `sources`, `jobs`, `sync_runs` в файле `jobagg.db` (или по пути из `JOBAGG_DB_PATH`).
+Creates the `sources`, `jobs`, and `sync_runs` tables in `jobagg.db` (or the path set in `JOBAGG_DB_PATH`).
 
-## 6. Синхронизация вакансий
+## 6. Sync jobs
 
-### Bundesagentur (Германия, без ключей)
+### Bundesagentur (Germany, no credentials needed)
 
 ```bash
 python3 -m jobagg sync bundesagentur \
@@ -78,76 +78,76 @@ python3 -m jobagg sync bundesagentur \
   --days 7
 ```
 
-| Флаг | Описание | Default |
+| Flag | Description | Default |
 |---|---|---|
-| `--query` | Поисковый запрос | `developer` |
-| `--location` | Город или регион | — |
-| `--pages` | Максимум страниц за прогон | `1` |
-| `--days` | Только вакансии за последние N дней | `7` |
+| `--query` | Search query | `developer` |
+| `--location` | City or region | — |
+| `--pages` | Max pages per run | `1` |
+| `--days` | Only jobs posted within the last N days | `7` |
 
-### Greenhouse (ATS, без ключей)
+### Greenhouse (ATS, no credentials needed)
 
 ```bash
 python3 -m jobagg sync greenhouse \
   --seed-file jobagg/seeds/greenhouse.txt
 ```
 
-### Lever (ATS, без ключей)
+### Lever (ATS, no credentials needed)
 
 ```bash
 python3 -m jobagg sync lever \
   --seed-file jobagg/seeds/lever.txt
 ```
 
-### Arbeitnow (EU-агрегатор, без ключей)
+### Arbeitnow (EU aggregator, no credentials needed)
 
 ```bash
 python3 -m jobagg sync arbeitnow --pages 5
 ```
 
-### Adzuna (только при наличии ключей и права использования)
+### Adzuna (requires credentials and confirmed usage rights)
 
-> **ВНИМАНИЕ:** Adzuna ToS ограничивают ongoing commercial aggregation после 14-дневного trial без письменного соглашения. Не запускайте без ключей и не используйте как production-source без лицензии.
+> **WARNING:** Adzuna's ToS restrict ongoing commercial aggregation after the 14-day trial without a written agreement. Do not run without valid credentials, and do not use as a production source without a license.
 
-Adzuna-адаптер будет добавлен позже. Для подключения потребуется:
-1. Зарегистрировать аккаунт на [developer.adzuna.com](https://developer.adzuna.com)
-2. Заполнить `ADZUNA_APP_ID` и `ADZUNA_APP_KEY` в `.env`
-3. Ознакомиться с [Terms of Service](https://developer.adzuna.com/terms)
+The Adzuna adapter will be added later. To enable it you will need to:
+1. Register at [developer.adzuna.com](https://developer.adzuna.com)
+2. Set `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` in `.env`
+3. Review the [Terms of Service](https://developer.adzuna.com/terms)
 
-## 7. Просмотр данных
+## 7. Browse data
 
 ```bash
-# Последние 20 вакансий по всем источникам
+# Last 20 jobs across all sources
 python3 -m jobagg list-jobs
 
-# Только Германия
+# Germany only
 python3 -m jobagg list-jobs --country DE --limit 50
 
-# Детали вакансии по id
+# Full details for a single job
 python3 -m jobagg show-job --id 1
 ```
 
-## 8. Автоматизация через cron
+## 8. Automate with cron
 
-Пример crontab для регулярного синка:
+Example crontab for regular syncing:
 
 ```cron
-# Bundesagentur — каждый час
+# Bundesagentur — every hour
 0 * * * * cd /path/to/ams-alternative && python3 -m jobagg sync bundesagentur --query "Python" --location "Berlin" --pages 3 >> logs/ba.log 2>&1
 
-# Greenhouse и Lever — 4 раза в день
+# Greenhouse and Lever — 4 times a day
 0 */6 * * * cd /path/to/ams-alternative && python3 -m jobagg sync greenhouse --seed-file jobagg/seeds/greenhouse.txt >> logs/gh.log 2>&1
 30 */6 * * * cd /path/to/ams-alternative && python3 -m jobagg sync lever --seed-file jobagg/seeds/lever.txt >> logs/lever.log 2>&1
 
-# Arbeitnow — каждые 3 часа
+# Arbeitnow — every 3 hours
 15 */3 * * * cd /path/to/ams-alternative && python3 -m jobagg sync arbeitnow --pages 5 >> logs/arbeitnow.log 2>&1
 ```
 
-## 9. AMS — только ручная ссылка
+## 9. AMS — manual links only
 
-AMS (Arbeitsmarktservice Österreich) **нельзя** синкать автоматически — их ToS запрещают automated mechanisms для masse job search. Сохранять можно только ручную ссылку пользователя.
+AMS (Arbeitsmarktservice Austria) **must not** be synced automatically — their ToS prohibit automated mass job search. Only user-provided deeplinks may be stored.
 
-## 10. Запуск тестов
+## 10. Run tests
 
 ```bash
 python3 -m pytest jobagg/tests/ -v
