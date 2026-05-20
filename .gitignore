@@ -1,0 +1,10 @@
+CLAUDE.md
+.env
+*.db
+*.db-wal
+*.db-shm
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.DS_Store
