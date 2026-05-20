@@ -30,6 +30,20 @@ def _slug(text: str | None) -> str:
     return text.strip("-")
 
 
+_DE_MARKERS = {
+    "aufgaben", "anforderungen", "wir suchen", "wir bieten", "stellenbeschreibung",
+    "ihr profil", "ihre aufgaben", "kenntnisse", "bewerbung", "vollzeit", "teilzeit",
+    "berufserfahrung", "deutsch", "unbefristet", "standort",
+}
+
+
+def detect_language(text: str) -> str:
+    """Heuristic: returns 'de' if text looks German, else 'en'."""
+    sample = clean_text(text)[:1000].lower()
+    hits = sum(1 for marker in _DE_MARKERS if marker in sample)
+    return "de" if hits >= 2 else "en"
+
+
 def build_dedup_key(
     title: str | None,
     company: str | None,

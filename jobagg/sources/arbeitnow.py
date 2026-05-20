@@ -4,7 +4,7 @@ from typing import Any, Iterator
 
 import httpx
 
-from jobagg.hashing import build_dedup_key, clean_text, description_hash
+from jobagg.hashing import build_dedup_key, clean_text, description_hash, detect_language
 from jobagg.sources.base import BaseJobSource
 
 _REMOTE_MAP = {True: "remote", False: "onsite"}
@@ -60,7 +60,7 @@ class ArbeitnowSource(BaseJobSource):
                     "description_text": desc,
                     "description_hash": description_hash(desc),
                     "dedup_key": build_dedup_key(title, company, location_text, desc),
-                    "language": "en",
+                    "language": detect_language(desc),
                     "raw_json": job,
                 }
 
