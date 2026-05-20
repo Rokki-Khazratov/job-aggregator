@@ -8,6 +8,22 @@ import httpx
 from jobagg.hashing import build_dedup_key, clean_text, description_hash
 from jobagg.sources.base import BaseJobSource
 
+_COUNTRY_MAP = {
+    "deutschland": "DE",
+    "germany": "DE",
+    "österreich": "AT",
+    "austria": "AT",
+    "schweiz": "CH",
+    "switzerland": "CH",
+    "liechtenstein": "LI",
+}
+
+
+def _normalize_country(raw: str | None) -> str:
+    if not raw:
+        return "DE"
+    return _COUNTRY_MAP.get(raw.lower(), raw.upper())
+
 
 class BundesagenturSource(BaseJobSource):
     name = "bundesagentur"
@@ -74,7 +90,7 @@ class BundesagenturSource(BaseJobSource):
                 first_place: dict[str, Any] = places[0] if places else (stub.get("arbeitsort") or {})
                 city = first_place.get("ort")
                 region = first_place.get("region")
-                country = first_place.get("land") or "DE"
+                country = _normalize_country(first_place.get("land"))
                 location_text = ", ".join(p for p in [city, region, country] if p)
 
                 yield {
