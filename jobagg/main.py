@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import traceback
 
@@ -9,6 +10,8 @@ from jobagg.sources.arbeitnow import ArbeitnowSource
 from jobagg.sources.bundesagentur import BundesagenturSource
 from jobagg.sources.greenhouse import GreenhouseSource
 from jobagg.sources.lever import LeverSource
+
+_BATCH_SIZE = 50
 
 
 def cmd_init_db(args: argparse.Namespace) -> None:
@@ -25,6 +28,27 @@ def cmd_sync(args: argparse.Namespace) -> None:
     run_id = db.start_sync_run(conn, source_name)
 
     jobs_seen = inserted = updated = deactivated = 0
+    batch: list[dict] = []
+
+    def _flush(batch: list[dict]) -> tuple[int, int]:
+        _ins = _upd = 0
+        for job in batch:
+            before = conn.execute("SELECT changes()").fetchone()[0]
+            db.upsert_job(conn, job)
+            # changes() returns 1 for both INSERT and UPDATE via ON CONFLICT;
+            # distinguish by checking whether first_seen_at == last_seen_at
+            # (only true on a brand-new row where both were set to the same :now)
+            row = conn.execute(
+                "SELECT first_seen_at, last_seen_at FROM jobs "
+                "WHERE source_name=? AND external_id=?",
+                (job["source_name"], job["external_id"]),
+            ).fetchone()
+            if row and row["first_seen_at"] == row["last_seen_at"]:
+                _ins += 1
+            else:
+                _upd += 1
+        conn.commit()
+        return _ins, _upd
 
     try:
         source, fetch_kwargs = _build_source(args)
@@ -32,24 +56,19 @@ def cmd_sync(args: argparse.Namespace) -> None:
 
         for job in source.fetch(**fetch_kwargs):
             jobs_seen += 1
-            ext_id = job.get("external_id", "")
-            seen_ids.add(ext_id)
+            seen_ids.add(job.get("external_id", ""))
+            batch.append(job)
 
-            before_changes = conn.execute("SELECT total_changes()").fetchone()[0]
-            db.upsert_job(conn, job)
-            after_changes = conn.execute("SELECT total_changes()").fetchone()[0]
+            if len(batch) >= _BATCH_SIZE:
+                ins, upd = _flush(batch)
+                inserted += ins
+                updated += upd
+                batch.clear()
 
-            if after_changes > before_changes:
-                # Distinguish insert vs update: if last_insert_rowid changed it was insert
-                row = conn.execute(
-                    "SELECT id, first_seen_at, last_seen_at FROM jobs WHERE source_name=? AND external_id=?",
-                    (job["source_name"], ext_id),
-                ).fetchone()
-                if row and row["first_seen_at"] == row["last_seen_at"]:
-                    inserted += 1
-                else:
-                    updated += 1
-            conn.commit()
+        if batch:
+            ins, upd = _flush(batch)
+            inserted += ins
+            updated += upd
 
         if source_name in ("greenhouse", "lever") and seen_ids:
             deactivated = db.deactivate_missing(conn, source_name, seen_ids)
@@ -69,6 +88,11 @@ def cmd_sync(args: argparse.Namespace) -> None:
         )
 
     except Exception as exc:
+        if batch:
+            try:
+                conn.commit()
+            except Exception:
+                pass
         db.finish_sync_run(
             conn, run_id,
             status="error",
@@ -79,6 +103,13 @@ def cmd_sync(args: argparse.Namespace) -> None:
         )
         print(f"[{source_name}] ERROR: {exc}", file=sys.stderr)
         sys.exit(1)
+
+
+def cmd_cleanup(args: argparse.Namespace) -> None:
+    conn = db.get_connection(args.db)
+    n = db.mark_stale(conn, stale_days=args.stale_days)
+    conn.commit()
+    print(f"Marked {n} jobs as inactive (last_seen_at older than {args.stale_days} days)")
 
 
 def _build_source(args: argparse.Namespace) -> tuple[object, dict]:
@@ -103,14 +134,26 @@ def cmd_list_jobs(args: argparse.Namespace) -> None:
     conn = db.get_connection(args.db)
     rows = db.list_jobs(conn, country=args.country, limit=args.limit)
     if not rows:
-        print("No jobs found.")
+        if args.format == "json":
+            print("[]")
+        else:
+            print("No jobs found.")
         return
-    for row in rows:
-        print(
-            f"[{row['id']}] {row['title']} @ {row['company'] or '—'} "
-            f"| {row['city'] or row['location_text'] or '—'} "
-            f"| {row['source_name']} | {row['date_posted'] or '—'}"
-        )
+
+    if args.format == "json":
+        result = []
+        for row in rows:
+            d = dict(row)
+            d.pop("raw_json", None)
+            result.append(d)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        for row in rows:
+            print(
+                f"[{row['id']}] {row['title']} @ {row['company'] or '—'} "
+                f"| {row['city'] or row['location_text'] or '—'} "
+                f"| {row['source_name']} | {row['date_posted'] or '—'}"
+            )
 
 
 def cmd_show_job(args: argparse.Namespace) -> None:
@@ -119,12 +162,15 @@ def cmd_show_job(args: argparse.Namespace) -> None:
     if not row:
         print(f"Job id={args.id} not found.", file=sys.stderr)
         sys.exit(1)
-    keys = row.keys()
-    for k in keys:
-        val = row[k]
-        if k in ("description_text", "raw_json") and val and len(str(val)) > 300:
-            val = str(val)[:300] + "…"
-        print(f"{k}: {val}")
+
+    if args.format == "json":
+        print(json.dumps(dict(row), ensure_ascii=False, indent=2))
+    else:
+        for k in row.keys():
+            val = row[k]
+            if k in ("description_text", "raw_json") and val and len(str(val)) > 300:
+                val = str(val)[:300] + "…"
+            print(f"{k}: {val}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -149,9 +195,14 @@ def build_parser() -> argparse.ArgumentParser:
     list_p = sub.add_parser("list-jobs", help="List jobs from the database")
     list_p.add_argument("--country", default=None, help="Filter by country code (e.g. DE)")
     list_p.add_argument("--limit", type=int, default=20, help="Max rows to show")
+    list_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
     show_p = sub.add_parser("show-job", help="Show a single job by id")
     show_p.add_argument("--id", type=int, required=True, help="Job id")
+    show_p.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
+    cleanup_p = sub.add_parser("cleanup", help="Mark stale jobs inactive")
+    cleanup_p.add_argument("--stale-days", type=int, default=30, help="Mark inactive if not seen in N days")
 
     return parser
 
@@ -167,6 +218,8 @@ def main() -> None:
         cmd_list_jobs(args)
     elif args.command == "show-job":
         cmd_show_job(args)
+    elif args.command == "cleanup":
+        cmd_cleanup(args)
 
 
 if __name__ == "__main__":

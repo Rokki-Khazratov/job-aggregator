@@ -127,9 +127,22 @@ ON CONFLICT(source_name, external_id) DO UPDATE SET
 """
 
 
+_SOURCES_SEED = [
+    ("bundesagentur", "api",        "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service", 1),
+    ("greenhouse",    "ats",         "https://boards-api.greenhouse.io/v1/boards",                1),
+    ("lever",         "ats",         "https://api.lever.co/v0/postings",                          1),
+    ("arbeitnow",     "aggregator",  "https://www.arbeitnow.com/api/job-board-api",               1),
+    ("adzuna",        "aggregator",  "https://api.adzuna.com/v1/api/jobs",                        0),
+]
+
+
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(_DDL)
     conn.executescript(_INDEXES)
+    conn.executemany(
+        "INSERT OR IGNORE INTO sources (name, source_type, base_url, is_active) VALUES (?,?,?,?)",
+        _SOURCES_SEED,
+    )
     conn.commit()
 
 
@@ -207,6 +220,16 @@ def finish_sync_run(
         (_now(), status, jobs_seen, inserted, updated, deactivated, error, run_id),
     )
     conn.commit()
+
+
+def mark_stale(conn: sqlite3.Connection, stale_days: int = 30) -> int:
+    """Mark is_active=0 for jobs not seen in the last stale_days days. Returns count."""
+    result = conn.execute(
+        "UPDATE jobs SET is_active=0 WHERE is_active=1 "
+        "AND julianday('now') - julianday(last_seen_at) > ?",
+        (stale_days,),
+    )
+    return result.rowcount
 
 
 def _now() -> str:
